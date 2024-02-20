@@ -1,52 +1,77 @@
-/**
- * @file: Users Controller
- * @description: NestJS Controller for Users
- * @author: Emre KILIÇ (https://github.com/adorratm)
- */
-
-import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UsePipes } from '@nestjs/common';
+import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
-import { User } from './user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import * as bcrypt from 'bcrypt';
+import { AuthGuard } from '@nestjs/passport';
+import { RoleGuard } from 'src/middlewares/role.guard';
+import { Role } from 'src/middlewares/role.decorator';
+import * as Joi from '@hapi/joi';
+import { JoiValidationPipe } from 'src/middlewares/joi-validation.pipe';
 
-// Controller: This is a basic controller decorator
-// Get: This is a basic HTTP GET method decorator
-// Post: This is a basic HTTP POST method decorator
-// Put: This is a basic HTTP PUT method decorator
-// Delete: This is a basic HTTP DELETE method decorator
-// Param: This is a basic HTTP parameter decorator
 
 @Controller('users')
 export class UsersController {
-    // Inject the users service
-    constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) { }
 
-    // Get all users
-    @Get()
-    findAll(): Promise<User[]> {
-        return this.usersService.findAll();
-    }
+  @Role(2) // Role 2 is for admin
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Get()
+  async getAllUsers(): Promise<User[]> {
+    const users = await this.usersService.getAllUsers();
+    return users;
+  }
 
-    // Get one user by email
-    @Get(':email')
-    findOne(@Param('email') email: string): Promise<User | undefined> {
-        return this.usersService.findOne(email);
-    }
+  @Role(2) // Role 2 is for admin
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Get(':id')
+  async getUserById(@Param('id') id: string): Promise<User | null> {
+    const user = await this.usersService.getUserById(+id);
+    return user;
+  }
 
-    // Create a user
-    @Post()
-    create(@Body() userData: Partial<User>): Promise<User> {
-        return this.usersService.create(userData);
-    }
+  @Role(2) // Role 2 is for admin
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Post()
+  @UsePipes(new JoiValidationPipe(Joi.object({
+    first_name: Joi.string().min(2).max(70).required(),
+    last_name: Joi.string().min(2).max(70).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(6).required(),
+    role: Joi.number().required()
+  }))) // Joi validation for the request body
+  async create(@Body() createUserDto: CreateUserDto) {
+    const hashedPassword = bcrypt.hashSync(createUserDto.password, 10);
+    createUserDto.password = hashedPassword;
+    const newUser = await this.usersService.createUser(createUserDto);
+    return newUser;
+  }
 
-    // Update a user
-    @Put(':id')
-    update(@Param('id') id: any, @Body() userData: Partial<User>): Promise<User | undefined> {
-        return this.usersService.update(id, userData);
+  @Role(2) // Role 2 is for admin
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Patch(':id')
+  @UsePipes(new JoiValidationPipe(Joi.object({
+    first_name: Joi.string().min(2).max(70),
+    last_name: Joi.string().min(2).max(70),
+    email: Joi.string().email(),
+    password: Joi.string().min(6),
+    role: Joi.number()
+  }))) // Joi validation for the request body
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    if(updateUserDto.password) {
+      const hashedPassword = bcrypt.hashSync(updateUserDto.password, 10);
+      updateUserDto.password = hashedPassword;
     }
+    const updatedUser = await this.usersService.updateUser(+id, updateUserDto);
+    return updatedUser;
+  }
 
-    // Delete a user
-    @Delete(':id')
-    delete(@Param('id') id: number): Promise<void> {
-        return this.usersService.delete(id);
-    }
+  @Role(2) // Role 2 is for admin
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Delete(':id')
+  async deleteById(@Param('id') id: string) : Promise<User> {
+    const user = await this.usersService.deleteById(+id);
+    return user;
+  }
 }

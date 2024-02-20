@@ -1,19 +1,29 @@
-/**
- * @file: Auth Module
- * @description: NestJS Module for Auth
- * @author: Emre KILIÇ (https://github.com/adorratm)
- */
-
-import { Module } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { UsersModule } from '../users/users.module';
-import { PassportModule } from '@nestjs/passport';
+import {Module} from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { User } from 'src/users/entities/user.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './jwt.strategy';
 
-// Module: This is a basic module decorator
 @Module({
-  imports: [UsersModule, PassportModule, JwtModule.register({ secret: process.env.JWT_SECRET_KEY, signOptions: { expiresIn: '60s' }, }),],
-  providers: [AuthService],
-  exports: [AuthService],
+    imports: [
+        PassportModule.register({ defaultStrategy: 'jwt' }),
+        JwtModule.registerAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                secret: config.get<string>('JWT_SECRET_KEY'),
+                signOptions: { expiresIn: config.get<string | number>('JWT_EXPIRES_IN') }
+            })
+        }),
+        TypeOrmModule.forFeature([User]),
+    ],
+    controllers: [AuthController],
+    providers: [AuthService, JwtStrategy],
+    exports: [JwtStrategy, PassportModule]
 })
+
 export class AuthModule { }

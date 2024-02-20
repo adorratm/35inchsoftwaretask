@@ -1,46 +1,70 @@
-/**
- * @file: auth.service.ts
- * @description: This file is responsible for the service layer of the auth module.
- * @author: Emre KILIÇ - (https://github.com/adorratm)
- */
-
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from 'src/users/entities/user.entity';
+import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../users/users.service';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+    constructor(@InjectRepository(User) private userRepository: Repository<User>, private jwtService: JwtService) { }
 
-    // Inject the UsersService and JwtService
-    constructor(private usersService: UsersService, private jwtService: JwtService) { }
+    async register(registerDto: RegisterDto): Promise<{ token: string }> {
+        const { first_name, last_name, email, password } = registerDto;
 
-    // Validate the user
-    async validateUser(email: string, password: string): Promise<any> {
-        // Find the user in the database
-        const user = await this.usersService.findOne(email);
-        if (user?.password === password) {
-            const result = { ...user, password };
-            // If the user is found and the password is correct, return the user
-            return result;
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = this.userRepository.create({
+            first_name,
+            last_name,
+            email,
+            password: hashedPassword,
+            role: 1 // 1 for user, 2 for admin
+        });
+
+        await this.userRepository.save(user);
+
+        const token = this.jwtService.sign({ email: user.email, id: user.id });
+
+        return { token };
+    }
+
+    async login(loginDto: LoginDto): Promise<{ token: string }> {
+        const { email, password } = loginDto;
+
+        const user = await this.userRepository.findOne({
+            where: { email },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Invalid credentials');
         }
-        // If the user is not found or the password is incorrect, throw an UnauthorizedException
-        throw new UnauthorizedException();
+
+        const isPasswordMatched = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordMatched) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+
+        const token = this.jwtService.sign({ id: user.id, email: user.email });
+
+        return { token };
     }
 
-    // Login method
-    async login(user: any) {
-        // Payload: This is the data that will be stored in the token
-        const payload = { sub: user.id, email: user.email };
-        // Return the access token
-        return {
-            // signAsync: This method will sign the payload and return a token
-            access_token: this.jwtService.signAsync(payload)
-        };
-    }
+    async getUser(token : any): Promise<User> {
+        
+        const { email } = this.jwtService.verify(token);
+        
+        const user = await this.userRepository.findOne({
+            where: { email }
+        });
 
-    // Register method
-    async register(user: any) {
-        // Create a new user in the database
-        return this.usersService.create(user);
+        if (!user) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+
+        return user;
     }
 }

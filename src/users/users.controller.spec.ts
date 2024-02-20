@@ -1,18 +1,14 @@
-/**
- * @file: Users Controller Spec
- * @description: NestJS Controller Spec for Users
- * @author: Emre KILIÇ (https://github.com/adorratm)
- */
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
 
-describe('UsersController', () => {
+describe('UserController', () => {
   let controller: UsersController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
+      providers: [UsersService],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);

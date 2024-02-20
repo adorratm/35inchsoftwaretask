@@ -1,13 +1,7 @@
-/**
- * @file: Users Service Spec
- * @description: NestJS Service Spec for Users
- * @author: Emre KILIÇ (https://github.com/adorratm)
- */
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 
-describe('UsersService', () => {
+describe('UserService', () => {
   let service: UsersService;
 
   beforeEach(async () => {

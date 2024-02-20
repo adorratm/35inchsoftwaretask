@@ -1,26 +1,43 @@
-/**
- * @file: auth.controller.ts
- * @description: This file is responsible for the controller layer of the auth module.
- * @author: Emre KILIÇ - (https://github.com/adorratm)
- */
+import { Body, Controller, Get, Post, UseGuards, Request, UsePipes } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { AuthGuard } from '@nestjs/passport';
+import * as Joi from '@hapi/joi';
+import { JoiValidationPipe } from 'src/middlewares/joi-validation.pipe';
 
-import { Controller, Post, Request } from '@nestjs/common';
-import { AuthService } from './auth.service'; 
 
 @Controller('auth')
 export class AuthController {
-    // Inject the auth service
-    constructor(private authService: AuthService) { }
+    constructor(private AuthService: AuthService) { }
 
-    // Login method
-    @Post('login')
-    async login(@Request() req: Request) {
-        return this.authService.login(req.body);
+
+    @Post('register')
+    @UsePipes(new JoiValidationPipe(Joi.object({
+        first_name: Joi.string().min(2).max(70).required(),
+        last_name: Joi.string().min(2).max(70).required(),
+        email: Joi.string().email().required(),
+        password: Joi.string().min(6).required(),
+        role: Joi.number().required()
+    }))) // Joi validation for the request body
+    async register(@Body() RegisterDto: RegisterDto): Promise<{ token: string }> {
+        return await this.AuthService.register(RegisterDto);
     }
 
-    // Register method
-    @Post('register')
-    async register(@Request() req: Request) {
-        return this.authService.register(req.body);
+    @Post('login')
+    @UsePipes(new JoiValidationPipe(Joi.object({
+        email: Joi.string().email().required(),
+        password: Joi.string().min(6).required(),
+    }))) // Joi validation for the request body
+    async login(@Body() LoginDto: LoginDto): Promise<{ token: string }> {
+        return await this.AuthService.login(LoginDto);
+    }
+
+    @Get('user')
+    @UseGuards(AuthGuard('jwt'))
+    async getUser(@Request() req: any): Promise<any> {
+        const token = req.headers.authorization.split(' ')[1];
+        console.log(token)
+        return await this.AuthService.getUser(token);
     }
 }
